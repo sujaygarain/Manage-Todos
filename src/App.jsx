@@ -1,46 +1,50 @@
 
 import { useState, useEffect } from "react";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { TodoProvider } from "./contexts";
+import { db } from "./firebaseConfig";
 import TodoForm from "./components/TodoForm";
 import TodoItem from "./components/TodoItem";
 
 function App() {
   const [todos, setTodos] = useState([]);
+  const todosCollectionRef = collection(db, "todos");
 
-  const addTodo = (todo) => {
-    setTodos((prev) => [{ id: Date.now(), ...todo }, ...prev]);
+  const fetchTodos = async () => {
+    const data = await getDocs(todosCollectionRef);
+    setTodos(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
   };
 
-  const updateTodo = (id, todo) => {
+  const addTodo = async (todo) => {
+    const docRef = await addDoc(todosCollectionRef, todo);
+    setTodos((prev) => [{ ...todo, id: docRef.id }, ...prev]);
+  };
+
+  const updateTodo = async (id, todo) => {
+    const todoDoc = doc(db, "todos", id);
+    await updateDoc(todoDoc, todo);
     setTodos((prev) =>
       prev.map((prevTodo) => (prevTodo.id === id ? { ...prevTodo, ...todo } : prevTodo))
     );
   };
 
-  const deleteTodo = (id) => {
+  const deleteTodo = async (id) => {
+    const todoDoc = doc(db, "todos", id);
+    await deleteDoc(todoDoc);
     setTodos((prev) => prev.filter((todo) => todo.id !== id));
   };
 
-  const toggleComplete = (id) => {
-    setTodos((prev) =>
-      prev.map((prevTodo) =>
-        prevTodo.id === id
-          ? { ...prevTodo, completed: !prevTodo.completed }
-          : prevTodo
-      )
-    );
+  const toggleComplete = async (id) => {
+    const todo = todos.find((todo) => todo.id === id);
+    if (!todo) return;
+
+    const updatedTodo = { completed: !todo.completed };
+    updateTodo(id, updatedTodo);
   };
 
   useEffect(() => {
-    const todos = JSON.parse(localStorage.getItem("todos"));
-    if (todos && todos.length > 0) {
-      setTodos(todos);
-    }
+    fetchTodos();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem("todos", JSON.stringify(todos));
-  }, [todos]);
 
   return (
     <TodoProvider
@@ -70,3 +74,4 @@ function App() {
 }
 
 export default App;
+
